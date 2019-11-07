@@ -39,6 +39,14 @@ SaltStack Modifications
             {% endfor %}
     {% endif %}
     {% endfor %}
+    
+## State Data Update All Packages
+
+    {% for jailname, jail in pillar.get('jail_vars', {}).items() %}
+    {{ jailname }}_jail_update_pkgs:
+        pkg.uptodate:
+          - jail: {{ jailname }}
+    {% endfor %}
 
 ## State Data Jails
 
