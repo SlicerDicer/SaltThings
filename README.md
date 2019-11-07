@@ -3,6 +3,7 @@ SaltStack Modifications
 
 
 ## For jails capabilities, apply the following to state.
+Reminder: Put jail.py in templates/patches/saltpatches/states/ or location if your choosing as seen below.
 
     {{ grains.saltpath }}/states/jail.py:
         file.managed:
