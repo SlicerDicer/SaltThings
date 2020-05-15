@@ -6,9 +6,6 @@ def status(name):
     Check jail status
 
     This checks the status of jails, are they running or dead?
-
-    name
-        jailname
     '''
 
     ret = {
@@ -20,21 +17,19 @@ def status(name):
 
     # Check the current state of jails.
     current_state = __salt__['jail.status'](name)
-    if current_state == True:
+    if current_state is True:
         ret['result'] = True
         ret['comment'] = 'Jail "{0}" is already running'.format(name)
         return ret
-    if current_state == False:
+    if current_state is False:
         ret['result'] = False
         ret['comment'] = 'Jail "{0}" is not running'.format(name)
         return ret
-    # The state of the system does need to be changed. Check if we're running
-    # in ``test=true`` mode.
-    if __opts__['test'] == True:
+
+    if __opts__['test'] is True:
         ret['result'] = None
         ret['comment'] = 'Jail "{0}" is not running.'.format(name)
         ret['changes'] = result
-
         return ret
 
     return ret
@@ -59,6 +54,16 @@ def start(name):
         ret['result'] = True
         ret['comment'] = 'Jail "{0}" is already running'.format(name)
         return ret
+    if current_state == False:
+        new_state = __salt__['jail.start'](name)
+        ret['result'] = True
+        ret['comment'] = 'Jail "{0}" was started'.format(name)
+        ret['changes'] = {
+            'old': current_state,
+            'new': new_state,
+        }
+        return ret
+
     if __opts__['test'] == True:
         ret['result'] = None
         ret['comment'] = 'Jail "{0}" is not running.'.format(name)
@@ -69,16 +74,47 @@ def start(name):
 
         return ret
 
-    new_state = __salt__['jail.start'](name)
+    return ret
 
-    ret['comment'] = 'Jail "{0}" was started'.format(name)
 
-    ret['changes'] = {
-        'old': current_state,
-        'new': new_state,
-    }
+def stop(name):
+    '''
+    Stop Jail
 
-    ret['result'] = True
+    This will allow the Stopping of jails as a state.
+
+    '''
+
+    ret = {
+        'name': name,
+        'changes': {},
+        'result': False,
+        'comment': '',
+        }
+    current_state = __salt__['jail.status'](name)
+    if current_state == True:
+        new_state = __salt__['jail.stop'](name)
+        ret['result'] = True
+        ret['comment'] = 'Jail "{0}" is running'.format(name)
+        ret['changes'] = {
+            'old': current_state,
+            'new': new_state,
+        }
+        return ret
+    if current_state == False:
+        ret['result'] = True
+        ret['comment'] = 'Jail "{0}" is already stopped'.format(name)
+        return ret
+
+    if __opts__['test'] == True:
+        ret['result'] = None
+        ret['comment'] = 'Jail "{0}" is running.'.format(name)
+        ret['changes'] = {
+            'old': current_state,
+            'new': 'stopping Jail "{0}"'.format(name),
+        }
+
+        return ret
 
     return ret
 
@@ -100,6 +136,25 @@ def restart(name):
 
     current_state = __salt__['jail.status'](name)
 
+    if current_state is True:
+        new_state = __salt__['jail.restart'](name)
+        ret['result'] = True
+        ret['comment'] = 'Jail "{0}" was restarted'.format(name)
+        ret['changes'] = {
+            'old': 'Jail "{0}" was running'.format(name),
+            'new': 'Restarting Jail "{0}"'.format(name),
+        }
+        return ret
+    if current_state is False:
+        new_state = __salt__['jail.restart'](name)
+        ret['result'] = True
+        ret['comment'] = 'Jail "{0}" was restarted'.format(name)
+        ret['changes'] = {
+            'old': 'Jail "{0}" was not running'.format(name),
+            'new': 'Starting Jail "{0}"'.format(name),
+        }
+        return ret
+
     if __opts__['test'] == True:
         ret['result'] = None
         ret['comment'] = 'Jail "{0}" is not running.'.format(name)
@@ -107,18 +162,73 @@ def restart(name):
             'old': current_state,
             'new': 'Restarting Jail "{0}"'.format(name),
         }
-
         return ret
 
-    new_state = __salt__['jail.restart'](name)
+    return ret
 
-    ret['comment'] = 'Jail "{0}" was restarted'.format(name)
 
-    ret['changes'] = {
-        'old': current_state,
-        'new': new_state,
-    }
+def upgrade(name, jailloc, version, jail_files):
+    '''
+    upgrade jail
 
-    ret['result'] = True
+    to upgrade release of jail
+    '''
+
+    ret = {
+        'name': name,
+        'changes': {},
+        'result': False,
+        'comment': '',
+        }
+    switch = ''
+    loclist = ['var/empty', 'lib', 'bin', 'sbin',
+               'usr/bin', 'usr/lib', 'usr/lib32',
+               'usr/libexec', 'usr/sbin', 'libexec']
+    jailversion = __salt__['grains.get']('jail:jail_' + name + '_installed')
+    if jailversion != version:
+        __salt__['jail.stop'](name)
+        # collecting list of locations with schg flag
+        for data in loclist:
+            data = '{0}{1}'.format(jailloc, data)
+            filelist = __salt__['file.readdir'](data)
+
+            for files in filelist:
+                truepath = data + '/' + files
+                schgdata = __salt__['chflags.change'](switch, 'noschg', truepath)
+
+        __salt__['archive.tar']('xzf', jail_files + str(version) + '/base.txz', dest=jailloc)
+        __salt__['archive.tar']('xzf', jail_files + str(version) + '/lib32.txz', dest=jailloc)
+        start_jail = __salt__['jail.start'](name)
+        if start_jail is True:
+            ret['result'] = True
+            ret['comment'] = 'Jail "{0}" is upgraded and restarted'.format(name)
+            ret['changes'] = {
+                'new': '{0}'.format(version),
+                'old': str(jailversion),
+                }
+            return ret
+        if start_jail is False:
+            ret['result'] = False
+            ret['comment'] = 'Jail "{0}" is upgraded and failed to restart'.format(name)
+            ret['changes'] = {
+                'new': '{0}'.format(version),
+                'old': str(jailversion),
+                }
+            return ret
+        return ret
+    else:
+        ret['result'] = True
+        ret['comment'] = 'Jail "{0}" is current version "{1}"'.format(name, version)
+        return ret
+
+    if __opts__['test'] is True:
+        ret['result'] = None
+        ret['comment'] = 'Jail "{0}" needs updating.'.format(name)
+        ret['changes'] = {
+            'new': '{0}'.format(version),
+            'old': str(jailversion),
+        }
+
+        return ret
 
     return ret
