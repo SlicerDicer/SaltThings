@@ -1,5 +1,5 @@
 
-# SaltThings Advanced
+# SaltThings
    SaltStack Jail Management
    
    Using these below, templating jail.conf and fstab.
