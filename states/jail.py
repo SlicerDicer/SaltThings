@@ -167,7 +167,7 @@ def restart(name):
     return ret
 
 
-def upgrade(name, jailloc, version, jail_files):
+def upgrade(name, jailloc, version, jail_files, snapshot=False):
     '''
     upgrade jail
 
@@ -185,21 +185,32 @@ def upgrade(name, jailloc, version, jail_files):
                'usr/bin', 'usr/lib', 'usr/lib32',
                'usr/libexec', 'usr/sbin', 'libexec']
     jailversion = __salt__['grains.get']('jail:jail_' + name + '_installed')
-    if jailversion != version:
-        __salt__['jail.stop'](name)
-        # collecting list of locations with schg flag
+
+    if jailversion != version and rollback is False:
+
+        if __salt__['zfs.exists'](jailloc[1:-1]) == False:
+            __salt__['zfs.create'](jailloc[1:-1])
+
+        if __salt__['jail.status'](name) is True:
+            __salt__['jail.stop'](name)
+
+        if snapshot is True:
+            __salt__['zfs.snapshot'](jailloc[1:-1] + '@' + jailversion)
+
         for data in loclist:
             data = '{0}{1}'.format(jailloc, data)
-            filelist = __salt__['file.readdir'](data)
-
-            for files in filelist:
-                truepath = data + '/' + files
-                schgdata = __salt__['chflags.change'](switch, 'noschg', truepath)
+            if __salt__['file.directory_exists'](data) is True:
+                filelist = __salt__['file.readdir'](data)
+                for files in filelist:
+                    truepath = data + '/' + files
+                    schgdata = __salt__['chflags.change'](switch, 'noschg', truepath)
 
         __salt__['archive.tar']('xzf', jail_files + str(version) + '/base.txz', dest=jailloc)
         __salt__['archive.tar']('xzf', jail_files + str(version) + '/lib32.txz', dest=jailloc)
-        start_jail = __salt__['jail.start'](name)
-        if start_jail is True:
+
+        __salt__['jail.start'](name)
+
+        if __salt__['jail.status'](name) is True:
             ret['result'] = True
             ret['comment'] = 'Jail "{0}" is upgraded and restarted'.format(name)
             ret['changes'] = {
@@ -207,7 +218,7 @@ def upgrade(name, jailloc, version, jail_files):
                 'old': str(jailversion),
                 }
             return ret
-        if start_jail is False:
+        if __salt__['jail.status'](name) is False:
             ret['result'] = False
             ret['comment'] = 'Jail "{0}" is upgraded and failed to restart'.format(name)
             ret['changes'] = {
@@ -216,7 +227,7 @@ def upgrade(name, jailloc, version, jail_files):
                 }
             return ret
         return ret
-    else:
+    if jailversion == version:
         ret['result'] = True
         ret['comment'] = 'Jail "{0}" is current version "{1}"'.format(name, version)
         return ret
