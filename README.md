@@ -10,6 +10,10 @@
    jail1 and jail2 on igb0, with nano installed.
    ip address will be 192.168.1.61 and 192.168.62
 
+   Saltstack Returner
+   
+   Working towards fully functional returner for Telegram.
+
 ## Installing the states/module in files.
 
 
