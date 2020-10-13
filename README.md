@@ -11,8 +11,19 @@
    ip address will be 192.168.1.61 and 192.168.62
 
    Saltstack Returner
-   
+
+   dhparams implemented in module and state.
+   Currently only working on FreeBSD
+
    Working towards fully functional returner for Telegram.
+
+## dhparams the state example
+
+
+    all_the_dh_params:
+        dhparam.create:
+            location: /path/to/dhparams.pem
+            bits: 2048
 
 ## Installing the states/module in files.
 
