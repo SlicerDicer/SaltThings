@@ -434,7 +434,7 @@ def manage(jail_files, version, jailloc, name, snapshot=False, lib32=False, src=
 
     .. code-block:: bash
 
-        salt '*' jail.upgrade <jail_files> <version> <jailloc> <name> 
+        salt '*' jail.manage <jail_files> <version> <jailloc> <name> 
     """
     jailversion = __salt__["grains.get"]('jail:jail_{0}_installed'.format(name))
 
