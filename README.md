@@ -46,11 +46,13 @@ Edit /usr/local/etc/salt/minion
 master: ipaddress
 id: salt_test
 ```
-Start SaltStack\
+Start SaltStack
 ```
 service salt_master start
 service salt_minion start
 ```
+Accept Minion Key\
+`salt-key -a salt_test`\
 Create jail zfs
 ```
 salt salt_test zfs.create zroot/jails
